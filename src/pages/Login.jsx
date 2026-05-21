@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
+import { authApi } from "../services/fakeApi";
 
 export default function Login() {
   const { login, loading, error, setError } = useAuth();
@@ -9,9 +10,23 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [step, setStep] = useState("login"); // login | register
+  const [name, setName] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [regLoading, setRegLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    if (!acceptedTerms) {
+      setError(
+        tr(
+          "Você deve aceitar os Termos para continuar",
+          "You must accept the Terms to continue",
+        ),
+      );
+      return;
+    }
     await login(email, password);
   };
 
@@ -163,6 +178,19 @@ export default function Login() {
                 onClick={() => {
                   setStep(t);
                   setError("");
+                  if (t === "register") {
+                    setName("");
+                    setEmail("");
+                    setPassword("");
+                    setConfirmPw("");
+                    setAcceptedTerms(false);
+                  } else {
+                    setEmail("");
+                    setPassword("");
+                    setConfirmPw("");
+                    setName("");
+                    setAcceptedTerms(false);
+                  }
                 }}
                 style={{
                   flex: 1,
@@ -392,6 +420,36 @@ export default function Login() {
                   </div>
                 )}
 
+                <div
+                  className="db-form-group"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 12,
+                  }}
+                >
+                  <input
+                    id="acceptTermsLogin"
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  />
+                  <label
+                    htmlFor="acceptTermsLogin"
+                    style={{ fontSize: 13, color: "var(--text-muted)" }}
+                  >
+                    {tr("Aceito os ", "I accept the ")}
+                    <a href="#" style={{ color: "var(--accent-primary)" }}>
+                      {tr("Termos de Serviço", "Terms of Service")}
+                    </a>{" "}
+                    {tr("e a ", "and the ")}
+                    <a href="#" style={{ color: "var(--accent-primary)" }}>
+                      {tr("Política de Privacidade", "Privacy Policy")}
+                    </a>
+                  </label>
+                </div>
+
                 <button
                   className="btn-primary-db"
                   type="submit"
@@ -445,47 +503,248 @@ export default function Login() {
                 )}
               </p>
 
-              <div
-                style={{
-                  textAlign: "center",
-                  padding: "32px 20px",
-                  background: "var(--bg-card)",
-                  borderRadius: 16,
-                  border: "1px solid var(--border-card)",
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setError("");
+                  if (!acceptedTerms) {
+                    setError(
+                      tr(
+                        "Você deve aceitar os Termos para continuar",
+                        "You must accept the Terms to continue",
+                      ),
+                    );
+                    return;
+                  }
+                  if (!name.trim()) {
+                    setError(
+                      tr("Informe seu nome", "Please provide your name"),
+                    );
+                    return;
+                  }
+                  if (password.length < 6) {
+                    setError(
+                      tr(
+                        "Senha muito curta (mínimo 6 caracteres)",
+                        "Password too short (min 6 chars)",
+                      ),
+                    );
+                    return;
+                  }
+                  if (password !== confirmPw) {
+                    setError(
+                      tr("As senhas não coincidem", "Passwords do not match"),
+                    );
+                    return;
+                  }
+                  setRegLoading(true);
+                  try {
+                    await authApi.register(name.trim(), email.trim(), password);
+                    // auto-login após cadastro
+                    await login(email.trim(), password);
+                  } catch (err) {
+                    setError(err.message || "Erro ao criar conta");
+                  } finally {
+                    setRegLoading(false);
+                  }
                 }}
               >
-                <i
-                  className="bi bi-code-slash"
-                  style={{
-                    fontSize: 40,
-                    color: "var(--accent-primary)",
-                    marginBottom: 16,
-                    display: "block",
-                  }}
-                />
+                <div className="db-form-group">
+                  <label>{tr("Nome", "Name")}</label>
+                  <input
+                    className="db-input"
+                    type="text"
+                    placeholder={tr("Seu nome completo", "Your full name")}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="db-form-group">
+                  <label>{tr("E-mail", "Email")}</label>
+                  <div style={{ position: "relative" }}>
+                    <i
+                      className="bi bi-envelope"
+                      style={{
+                        position: "absolute",
+                        left: 14,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        color: "var(--text-muted)",
+                      }}
+                    />
+                    <input
+                      className="db-input"
+                      style={{ paddingLeft: 40 }}
+                      type="email"
+                      placeholder={tr("seu@email.com", "you@email.com")}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="db-form-group">
+                  <label>{tr("Senha", "Password")}</label>
+                  <div style={{ position: "relative" }}>
+                    <i
+                      className="bi bi-lock"
+                      style={{
+                        position: "absolute",
+                        left: 14,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        color: "var(--text-muted)",
+                      }}
+                    />
+                    <input
+                      className="db-input"
+                      style={{ paddingLeft: 40, paddingRight: 44 }}
+                      type={showPw ? "text" : "password"}
+                      placeholder={tr("Crie uma senha", "Create a password")}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                    <i
+                      className={`bi bi-eye${showPw ? "-slash" : ""}`}
+                      onClick={() => setShowPw((s) => !s)}
+                      style={{
+                        position: "absolute",
+                        right: 14,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        color: "var(--text-muted)",
+                        cursor: "pointer",
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="db-form-group">
+                  <label>{tr("Confirme a senha", "Confirm password")}</label>
+                  <div style={{ position: "relative" }}>
+                    <i
+                      className="bi bi-lock"
+                      style={{
+                        position: "absolute",
+                        left: 14,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        color: "var(--text-muted)",
+                      }}
+                    />
+                    <input
+                      className="db-input"
+                      style={{ paddingLeft: 40 }}
+                      type={showPw ? "text" : "password"}
+                      placeholder={tr("Repita a senha", "Repeat the password")}
+                      value={confirmPw}
+                      onChange={(e) => setConfirmPw(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {error && (
+                  <div
+                    style={{
+                      background: "rgba(255,77,106,0.1)",
+                      border: "1px solid rgba(255,77,106,0.2)",
+                      borderRadius: 8,
+                      padding: "10px 14px",
+                      marginBottom: 16,
+                      fontSize: 13,
+                      color: "var(--danger)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <i className="bi bi-exclamation-circle" />
+                    {error}
+                  </div>
+                )}
+
                 <div
+                  className="db-form-group"
                   style={{
-                    fontFamily: "Syne",
-                    fontWeight: 700,
-                    fontSize: 15,
-                    marginBottom: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 12,
                   }}
                 >
-                  {tr("API em desenvolvimento", "API in development")}
+                  <input
+                    id="acceptTermsRegister"
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  />
+                  <label
+                    htmlFor="acceptTermsRegister"
+                    style={{ fontSize: 13, color: "var(--text-muted)" }}
+                  >
+                    {tr("Aceito os ", "I accept the ")}
+                    <a href="#" style={{ color: "var(--accent-primary)" }}>
+                      {tr("Termos de Serviço", "Terms of Service")}
+                    </a>{" "}
+                    {tr("e a ", "and the ")}
+                    <a href="#" style={{ color: "var(--accent-primary)" }}>
+                      {tr("Política de Privacidade", "Privacy Policy")}
+                    </a>
+                  </label>
                 </div>
-                <p
+
+                <button
+                  className="btn-primary-db"
+                  type="submit"
+                  disabled={regLoading}
+                >
+                  {regLoading ? (
+                    <>
+                      <span
+                        className="spinner"
+                        style={{
+                          width: 18,
+                          height: 18,
+                          display: "inline-block",
+                          marginRight: 8,
+                          verticalAlign: "middle",
+                        }}
+                      />
+                      {tr("Criando...", "Creating...")}
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-person-plus me-2" />
+                      {tr("Criar conta", "Create account")}
+                    </>
+                  )}
+                </button>
+                <div
                   style={{
-                    fontSize: 13,
+                    fontSize: 12,
                     color: "var(--text-muted)",
-                    lineHeight: 1.6,
+                    marginTop: 12,
                   }}
                 >
                   {tr(
-                    "O cadastro será disponibilizado quando a API C# estiver integrada. Por enquanto, use os acessos demo.",
-                    "Sign-up will be available when the C# API is integrated. For now, use demo access.",
+                    "Ao criar conta, você concorda com os ",
+                    "By creating an account you agree to the ",
                   )}
-                </p>
-              </div>
+                  <a href="#" style={{ color: "var(--accent-primary)" }}>
+                    {tr("Termos de Serviço", "Terms of Service")}
+                  </a>
+                  {tr(" e a ", " and the ")}
+                  <a href="#" style={{ color: "var(--accent-primary)" }}>
+                    {tr("Política de Privacidade", "Privacy Policy")}
+                  </a>
+                  .
+                </div>
+              </form>
             </>
           )}
         </div>

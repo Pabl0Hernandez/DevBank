@@ -328,6 +328,26 @@ export const authApi = {
     return { user: safeUser, token: `fake-jwt-token-${Date.now()}` };
   },
 
+  async register(name, email, password) {
+    await delay();
+    const exists = USERS.find((u) => u.email === email);
+    if (exists) throw new Error("E-mail já cadastrado.");
+    const newUser = {
+      id: Date.now(),
+      name: name || email.split("@")[0],
+      email,
+      password,
+      role: "Usuário",
+      avatar: (name || email).slice(0, 2).toUpperCase(),
+      phone: "",
+      birthDate: "",
+      address: "",
+    };
+    USERS.push(newUser);
+    const { password: _, ...safeUser } = newUser;
+    return { user: safeUser, token: `fake-jwt-token-${Date.now()}` };
+  },
+
   async logout() {
     await delay(200);
     return { success: true };
