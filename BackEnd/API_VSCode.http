@@ -1,0 +1,6 @@
+@API_VSCode_HostAddress = http://localhost:5180
+
+GET {{API_VSCode_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
