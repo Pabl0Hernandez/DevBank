@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { cardsApi } from "../services/fakeApi";
+import { cardsApi } from "../services/supabaseApi";
 import CreditCard from "../components/CreditCard";
 import { useI18n } from "../context/I18nContext";
 

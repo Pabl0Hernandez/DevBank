@@ -15,7 +15,7 @@ import {
   Legend,
 } from "recharts";
 import { useAuth } from "../context/AuthContext";
-import { statsApi, transactionsApi } from "../services/fakeApi";
+import { statsApi, transactionsApi } from "../services/supabaseApi";
 import { useI18n } from "../context/I18nContext";
 
 const CustomTooltip = ({ active, payload, label, formatCurrency }) => {
@@ -87,8 +87,8 @@ export default function Statistics() {
   useEffect(() => {
     if (!user) return;
     Promise.all([
-      statsApi.monthlyBalance(),
-      statsApi.categorySpend(),
+      statsApi.monthlyBalance(user.id),
+      statsApi.categorySpend(user.id),
       transactionsApi.summary(user.id),
     ])
       .then(([m, c, s]) => {

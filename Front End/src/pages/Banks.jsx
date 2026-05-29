@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { banksApi } from "../services/fakeApi";
+import { banksApi } from "../services/supabaseApi";
 import { useI18n } from "../context/I18nContext";
 
 export default function Banks() {

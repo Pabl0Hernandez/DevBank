@@ -9,7 +9,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useAuth } from "../context/AuthContext";
-import { cardsApi, transactionsApi, statsApi } from "../services/fakeApi";
+import { cardsApi, transactionsApi, statsApi } from "../services/supabaseApi";
 import { useI18n } from "../context/I18nContext";
 
 const fmt = (v, locale) =>
@@ -104,7 +104,7 @@ export default function Dashboard({ onNavigate }) {
       cardsApi.list(user.id),
       transactionsApi.list(user.id),
       transactionsApi.summary(user.id),
-      statsApi.monthlyBalance(),
+      statsApi.monthlyBalance(user.id),
     ])
       .then(([c, t, s, ch]) => {
         setCards(c);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { cardsApi } from "../services/fakeApi";
+import { cardsApi } from "../services/supabaseApi";
 import { useI18n } from "../context/I18nContext";
 
 const CONTACTS = [

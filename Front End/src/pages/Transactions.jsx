@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { transactionsApi } from "../services/fakeApi";
+import { transactionsApi } from "../services/supabaseApi";
 import { useI18n } from "../context/I18nContext";
 
 const CATEGORIES = [

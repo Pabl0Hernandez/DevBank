@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
-import { authApi } from "../services/fakeApi";
+import { authApi } from "../services/supabaseApi";
 
 export default function Login() {
   const { login, loading, error, setError } = useAuth();
