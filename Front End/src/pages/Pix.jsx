@@ -1,11 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
+import { pixApi } from "../services/supabaseApi";
 
 export default function Pix() {
   const { user } = useAuth();
   const { tr, formatCurrency } = useI18n();
-  const [tab, setTab] = useState("cobrar"); // cobrar | pagar
+  const [tab, setTab] = useState("cobrar"); // cobrar | pagar | minhas-chaves
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [pixKey, setPixKey] = useState("");
@@ -13,21 +14,89 @@ export default function Pix() {
   const [success, setSuccess] = useState(false);
   const [keyType, setKeyType] = useState("cpf");
 
+  // Estados para gerenciar chaves PIX
+  const [myPixKeys, setMyPixKeys] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [newKeyType, setNewKeyType] = useState("cpf");
+  const [newKeyValue, setNewKeyValue] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Carregar chaves PIX do usuário
+  useEffect(() => {
+    if (user) {
+      setLoading(true);
+      pixApi
+        .list(user.id)
+        .then(setMyPixKeys)
+        .catch((err) => console.error(err))
+        .finally(() => setLoading(false));
+    }
+  }, [user]);
+
+  const handleAddPixKey = async (e) => {
+    e.preventDefault();
+    if (!newKeyValue.trim()) return;
+
+    setSaving(true);
+    try {
+      await pixApi.create(user.id, newKeyType, newKeyValue);
+      const keys = await pixApi.list(user.id);
+      setMyPixKeys(keys);
+      setNewKeyValue("");
+      setNewKeyType("cpf");
+    } catch (err) {
+      alert(`Erro: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeletePixKey = async (pixKeyId) => {
+    if (!confirm(tr("Remover esta chave PIX?", "Remove this PIX key?"))) return;
+    try {
+      await pixApi.remove(pixKeyId);
+      const keys = await pixApi.list(user.id);
+      setMyPixKeys(keys);
+    } catch (err) {
+      alert(`Erro: ${err.message}`);
+    }
+  };
+
   const handleAction = async (e) => {
     e.preventDefault();
+    if (!user || !amount) return;
+
     setSending(true);
-    await new Promise((r) => setTimeout(r, 1500));
-    setSending(false);
-    setSuccess(true);
+    try {
+      // Simular processamento do PIX
+      await new Promise((r) => setTimeout(r, 1500));
+
+      // Registrar transação no banco
+      const type = tab === "cobrar" ? "credit" : "debit";
+      const desc =
+        description ||
+        (tab === "cobrar"
+          ? tr("PIX recebido", "PIX received")
+          : tr("PIX enviado", "PIX sent"));
+
+      await pixApi.recordTransaction(user.id, type, amount, desc, "Transação");
+
+      // Limpar formulário
+      setAmount("");
+      setDescription("");
+      setPixKey("");
+      setSending(false);
+      setSuccess(true);
+
+      // Voltar ao formulário após 3 segundos
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      alert(`Erro: ${err.message}`);
+      setSending(false);
+    }
   };
 
   const fmtAmt = (v) => formatCurrency(parseFloat(v || 0));
-
-  const MY_KEYS = [
-    { type: "CPF", value: "***.***.789-00", icon: "person-badge" },
-    { type: tr("E-mail", "Email"), value: user?.email || "", icon: "envelope" },
-    { type: tr("Telefone", "Phone"), value: user?.phone || "", icon: "phone" },
-  ];
 
   return (
     <div className="page-content">
@@ -59,6 +128,11 @@ export default function Pix() {
             id: "pagar",
             label: tr("Pagar / Enviar", "Pay / Send"),
             icon: "send",
+          },
+          {
+            id: "minhas-chaves",
+            label: tr("Minhas Chaves", "My Keys"),
+            icon: "key",
           },
         ].map((t) => (
           <button
@@ -550,46 +624,238 @@ export default function Pix() {
             <div className="section-hd">
               <h2>{tr("Minhas Chaves Pix", "My Pix Keys")}</h2>
             </div>
-            {MY_KEYS.map((k) => (
-              <div
-                key={k.type}
-                className="bank-item"
-                style={{ marginBottom: 10 }}
-              >
-                <div
-                  className="bank-logo"
+
+            {tab === "minhas-chaves" ? (
+              <>
+                {loading ? (
+                  <div style={{ textAlign: "center", padding: "20px" }}>
+                    <div className="spinner" />
+                  </div>
+                ) : myPixKeys.length === 0 ? (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: "20px",
+                      color: "var(--text-muted)",
+                      fontSize: 13,
+                    }}
+                  >
+                    <p>
+                      {tr("Nenhuma chave registrada", "No keys registered")}
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ marginBottom: 20 }}>
+                    {myPixKeys.map((key) => (
+                      <div
+                        key={key.id}
+                        className="bank-item"
+                        style={{ marginBottom: 10 }}
+                      >
+                        <div
+                          className="bank-logo"
+                          style={{
+                            background: "rgba(0,229,160,0.12)",
+                            color: "var(--accent-primary)",
+                          }}
+                        >
+                          <i
+                            className={`bi bi-${
+                              key.key_type === "cpf"
+                                ? "person-badge"
+                                : key.key_type === "email"
+                                  ? "envelope"
+                                  : "phone"
+                            }`}
+                          />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div
+                            className="bank-name"
+                            style={{ textTransform: "uppercase" }}
+                          >
+                            {key.key_type}
+                          </div>
+                          <div className="bank-sub" style={{ fontSize: 12 }}>
+                            {key.key_value}
+                          </div>
+                          {key.is_primary && (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                background: "rgba(0,229,160,0.15)",
+                                color: "var(--accent-primary)",
+                                padding: "2px 6px",
+                                borderRadius: 4,
+                                marginTop: 4,
+                                display: "inline-block",
+                              }}
+                            >
+                              {tr("Principal", "Primary")}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          style={{
+                            background: "none",
+                            border: "none",
+                            color: "var(--text-muted)",
+                            cursor: "pointer",
+                            fontSize: 16,
+                          }}
+                          onClick={() => handleDeletePixKey(key.id)}
+                        >
+                          <i className="bi bi-trash" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <form
+                  onSubmit={handleAddPixKey}
                   style={{
-                    background: "rgba(0,229,160,0.12)",
-                    color: "var(--accent-primary)",
+                    marginTop: 20,
+                    paddingTop: 20,
+                    borderTop: "1px solid var(--border-card)",
                   }}
                 >
-                  <i className={`bi bi-${k.icon}`} />
-                </div>
-                <div>
-                  <div className="bank-name">{k.type}</div>
-                  <div className="bank-sub">{k.value}</div>
-                </div>
+                  <div className="db-form-group">
+                    <label>{tr("Tipo de chave", "Key type")}</label>
+                    <select
+                      className="db-input"
+                      value={newKeyType}
+                      onChange={(e) => setNewKeyType(e.target.value)}
+                    >
+                      <option value="cpf">CPF</option>
+                      <option value="email">{tr("E-mail", "Email")}</option>
+                      <option value="telefone">
+                        {tr("Telefone", "Phone")}
+                      </option>
+                    </select>
+                  </div>
+
+                  <div className="db-form-group">
+                    <label>{tr("Valor da chave", "Key value")}</label>
+                    <input
+                      className="db-input"
+                      type="text"
+                      placeholder={
+                        newKeyType === "cpf"
+                          ? "123.456.789-10"
+                          : newKeyType === "email"
+                            ? "seu@email.com"
+                            : "(11) 9 9999-0000"
+                      }
+                      value={newKeyValue}
+                      onChange={(e) => setNewKeyValue(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <button
+                    className="btn-primary-db"
+                    type="submit"
+                    disabled={saving || !newKeyValue.trim()}
+                    style={{ width: "100%" }}
+                  >
+                    {saving ? (
+                      <>
+                        <span
+                          className="spinner"
+                          style={{
+                            width: 16,
+                            height: 16,
+                            display: "inline-block",
+                            marginRight: 8,
+                          }}
+                        />
+                        {tr("Salvando...", "Saving...")}
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-plus-circle me-2" />
+                        {tr("Cadastrar Chave", "Register Key")}
+                      </>
+                    )}
+                  </button>
+                </form>
+              </>
+            ) : (
+              <>
+                {myPixKeys.length === 0 ? (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: "20px",
+                      color: "var(--text-muted)",
+                      fontSize: 13,
+                    }}
+                  >
+                    <p>
+                      {tr("Nenhuma chave registrada", "No keys registered")}
+                    </p>
+                  </div>
+                ) : (
+                  myPixKeys.map((key) => (
+                    <div
+                      key={key.id}
+                      className="bank-item"
+                      style={{ marginBottom: 10 }}
+                    >
+                      <div
+                        className="bank-logo"
+                        style={{
+                          background: "rgba(0,229,160,0.12)",
+                          color: "var(--accent-primary)",
+                        }}
+                      >
+                        <i
+                          className={`bi bi-${
+                            key.key_type === "cpf"
+                              ? "person-badge"
+                              : key.key_type === "email"
+                                ? "envelope"
+                                : "phone"
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <div
+                          className="bank-name"
+                          style={{ textTransform: "uppercase" }}
+                        >
+                          {key.key_type}
+                        </div>
+                        <div className="bank-sub" style={{ fontSize: 12 }}>
+                          {key.key_value}
+                        </div>
+                      </div>
+                      <button
+                        style={{
+                          marginLeft: "auto",
+                          background: "none",
+                          border: "none",
+                          color: "var(--text-muted)",
+                          cursor: "pointer",
+                          fontSize: 16,
+                        }}
+                      >
+                        <i className="bi bi-copy" />
+                      </button>
+                    </div>
+                  ))
+                )}
                 <button
-                  style={{
-                    marginLeft: "auto",
-                    background: "none",
-                    border: "none",
-                    color: "var(--text-muted)",
-                    cursor: "pointer",
-                    fontSize: 16,
-                  }}
+                  className="btn-outline-db mt-2"
+                  style={{ width: "100%", fontSize: 13 }}
+                  onClick={() => setTab("minhas-chaves")}
                 >
-                  <i className="bi bi-copy" />
+                  <i className="bi bi-plus-circle me-2" />
+                  {tr("Cadastrar nova chave", "Register new key")}
                 </button>
-              </div>
-            ))}
-            <button
-              className="btn-outline-db mt-2"
-              style={{ width: "100%", fontSize: 13 }}
-            >
-              <i className="bi bi-plus-circle me-2" />
-              {tr("Cadastrar nova chave", "Register new key")}
-            </button>
+              </>
+            )}
           </div>
         </div>
       </div>

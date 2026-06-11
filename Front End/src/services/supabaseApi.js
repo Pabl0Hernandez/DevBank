@@ -28,19 +28,41 @@ export const authApi = {
   },
 
   async register(name, email, password) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name,
+    // Registrar usuário
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp(
+      {
+        email,
+        password,
+        options: {
+          data: {
+            name,
+          },
+          emailRedirectTo: `${window.location.origin}/`,
         },
       },
-    });
-    if (error) throw new Error(error.message);
+    );
+    if (signUpError) throw new Error(signUpError.message);
+
+    // Auto-login após registrar (funciona se email confirmation estiver desabilitado)
+    try {
+      const { data: loginData, error: loginError } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+      if (!loginError && loginData?.user) {
+        return {
+          user: normalizeUser(loginData.user),
+          token: loginData.session?.access_token || null,
+        };
+      }
+    } catch (err) {
+      // Se auto-login falhar, retorna dados do sign-up
+    }
+
     return {
-      user: normalizeUser(data.user),
-      token: data.session?.access_token || null,
+      user: normalizeUser(signUpData.user),
+      token: signUpData.session?.access_token || null,
     };
   },
 
@@ -180,5 +202,80 @@ export const statsApi = {
       return acc;
     }, {});
     return Object.entries(bucket).map(([name, value]) => ({ name, value }));
+  },
+};
+
+export const pixApi = {
+  async list(userId) {
+    const data = await handleResponse(
+      await supabase
+        .from("pix_keys")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false }),
+    );
+    return data;
+  },
+
+  async create(userId, keyType, keyValue) {
+    // Remover pontuação para validação
+    const cleanValue = keyValue.replace(/\D/g, "");
+
+    const data = await handleResponse(
+      await supabase.from("pix_keys").insert([
+        {
+          user_id: userId,
+          key_type: keyType,
+          key_value: keyValue,
+          is_primary: false,
+        },
+      ]),
+    );
+    return data[0];
+  },
+
+  async remove(pixKeyId) {
+    await handleResponse(
+      await supabase.from("pix_keys").delete().eq("id", pixKeyId),
+    );
+    return { success: true };
+  },
+
+  async setPrimary(pixKeyId) {
+    const data = await handleResponse(
+      await supabase
+        .from("pix_keys")
+        .update({ is_primary: true })
+        .eq("id", pixKeyId),
+    );
+    return data[0];
+  },
+
+  async recordTransaction(
+    userId,
+    type,
+    amount,
+    description,
+    category = "Transação",
+  ) {
+    // Registra uma transação de PIX
+    // type: "credit" (recebimento) ou "debit" (envio)
+    const today = new Date().toISOString().split("T")[0];
+    const data = await handleResponse(
+      await supabase.from("transactions").insert([
+        {
+          user_id: userId,
+          name:
+            description || `PIX ${type === "credit" ? "Recebido" : "Enviado"}`,
+          category,
+          amount: Math.abs(Number(amount || 0)),
+          date: today,
+          type,
+          icon: type === "credit" ? "arrow-down-circle" : "arrow-up-circle",
+          color: type === "credit" ? "#00e5a0" : "#ff6b6b",
+        },
+      ]),
+    );
+    return data[0];
   },
 };

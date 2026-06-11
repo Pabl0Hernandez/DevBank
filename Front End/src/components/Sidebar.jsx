@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
+import { transactionsApi } from "../services/supabaseApi";
 
 const navItems = [
   {
@@ -22,7 +23,7 @@ const navItems = [
     icon: "arrow-left-right",
     labelPt: "Transações",
     labelEn: "Transactions",
-    badge: "12",
+    badge: null,
   },
   {
     id: "statistics",
@@ -75,7 +76,19 @@ export default function Sidebar({ active, onNavigate, isOpen, onClose }) {
   const { user, logout } = useAuth();
   const { tr } = useI18n();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [transactionCount, setTransactionCount] = useState(0);
   const profileMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (user) {
+      transactionsApi
+        .list(user.id)
+        .then((txs) => setTransactionCount(txs.length))
+        .catch(() => setTransactionCount(0));
+    } else {
+      setTransactionCount(0);
+    }
+  }, [user]);
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -127,7 +140,12 @@ export default function Sidebar({ active, onNavigate, isOpen, onClose }) {
             >
               <i className={`bi bi-${item.icon}`} />
               {tr(item.labelPt, item.labelEn)}
-              {item.badge && <span className="nav-badge">{item.badge}</span>}
+              {item.id === "transactions" && transactionCount > 0 && (
+                <span className="nav-badge">{transactionCount}</span>
+              )}
+              {item.id !== "transactions" && item.badge && (
+                <span className="nav-badge">{item.badge}</span>
+              )}
             </button>
           ))}
 
